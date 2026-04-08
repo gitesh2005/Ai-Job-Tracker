@@ -5,12 +5,20 @@ import errorMiddleware from './middleware/error.middleware';
 import authRoutes from './modules/auth/auth.routes';
 import applicationRoutes from './modules/applications/application.routes';
 import aiRoutes from './modules/ai/ai.routes';
+import { helmetMiddleware, generalLimiter } from './middleware/security.middleware';
+import { sanitizeInput } from './middleware/validation.middleware';
 
 const app: Application = express();
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(helmetMiddleware);
+app.use(cors({
+  origin: config.clientUrl,
+  credentials: true,
+}));
+app.use(generalLimiter);
+app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(sanitizeInput);
 
 app.get('/health', (req: Request, res: Response) => {
   res.status(200).json({ success: true, message: 'Server is running' });

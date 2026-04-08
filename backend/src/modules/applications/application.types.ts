@@ -12,6 +12,7 @@ export interface CreateApplicationInput {
   niceToHaveSkills?: string[];
   seniority?: string;
   location?: string;
+  resumeSuggestions?: string[];
 }
 
 export interface UpdateApplicationInput {

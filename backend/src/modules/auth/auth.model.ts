@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 export interface IUser extends Document {
   email: string;
   password: string;
+  createdAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
 }
 
@@ -19,7 +20,7 @@ const userSchema = new Schema<IUser>(
     password: {
       type: String,
       required: [true, 'Password is required'],
-      minlength: 6,
+      select: false,
     },
   },
   {

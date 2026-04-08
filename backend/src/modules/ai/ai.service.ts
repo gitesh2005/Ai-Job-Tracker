@@ -108,6 +108,13 @@ const parseLocally = (text: string): ParsedJobData => {
     niceToHaveSkills: foundNiceToHaveSkills,
     seniority,
     location,
+    resumeSuggestions: [
+      `Demonstrated proficiency in ${foundRequiredSkills.slice(0, 2).join(', ') || 'relevant technologies'}`,
+      'Strong problem-solving and analytical skills',
+      'Excellent communication and collaboration abilities',
+      `Experience working with ${foundNiceToHaveSkills.slice(0, 2).join(', ') || 'modern tools'}`,
+      'Proven ability to work in fast-paced environments',
+    ],
   };
 };
 
@@ -122,7 +129,7 @@ const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobDat
         'X-Title': 'AI Job Tracker',
       },
       body: JSON.stringify({
-        model: 'deepseek/deepseek-chat-v3-0324:free',
+        model: 'google/gemma-2-9b-it',
         messages: [
           {
             role: 'system',
@@ -134,9 +141,10 @@ Return ONLY a valid JSON object with this exact structure:
   "requiredSkills": ["skill1", "skill2", ...],
   "niceToHaveSkills": ["skill1", "skill2", ...],
   "seniority": "Intern/Junior/Mid/Senior/Lead/Principal/Staff/Manager/Director or 'Mid'",
-  "location": "city name or 'Remote' or 'Not specified'"
+  "location": "city name or 'Remote' or 'Not specified'",
+  "resumeSuggestions": ["bullet point 1", "bullet point 2", "bullet point 3", "bullet point 4", "bullet point 5"]
 }
-Do not include any additional text or explanation.`
+resumeSuggestions should be 3-5 concise, role-specific bullet points useful for a resume. Do not include any additional text or explanation.`
           },
           {
             role: 'user',
@@ -148,12 +156,10 @@ Do not include any additional text or explanation.`
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('OpenRouter API error:', errorData);
       return parseLocally(jobDescription.toLowerCase());
     }
 
-    const data = await response.json();
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
@@ -161,7 +167,11 @@ Do not include any additional text or explanation.`
     }
 
     try {
-      const parsed = JSON.parse(content);
+      let cleanContent = content.trim();
+      if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+      }
+      const parsed = JSON.parse(cleanContent);
       return {
         company: parsed.company || 'Not specified',
         role: parsed.role || 'Not specified',
@@ -169,6 +179,7 @@ Do not include any additional text or explanation.`
         niceToHaveSkills: Array.isArray(parsed.niceToHaveSkills) ? parsed.niceToHaveSkills : [],
         seniority: parsed.seniority || 'Mid',
         location: parsed.location || 'Not specified',
+        resumeSuggestions: Array.isArray(parsed.resumeSuggestions) ? parsed.resumeSuggestions : [],
       };
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
@@ -220,7 +231,7 @@ Do not include any additional text or explanation.`
       return parseLocally(jobDescription.toLowerCase());
     }
 
-    const data = await response.json();
+    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
@@ -236,6 +247,7 @@ Do not include any additional text or explanation.`
         niceToHaveSkills: Array.isArray(parsed.niceToHaveSkills) ? parsed.niceToHaveSkills : [],
         seniority: parsed.seniority || 'Mid',
         location: parsed.location || 'Not specified',
+        resumeSuggestions: Array.isArray(parsed.resumeSuggestions) ? parsed.resumeSuggestions : [],
       };
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
