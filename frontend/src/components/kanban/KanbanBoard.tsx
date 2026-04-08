@@ -1,6 +1,8 @@
-import { DndContext, DragEndEvent, closestCenter, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { useState } from 'react';
+import { DndContext, DragEndEvent, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors, DragOverlay } from '@dnd-kit/core';
 import { Application, ApplicationStatus } from '../../types';
 import KanbanColumn from './KanbanColumn';
+import ApplicationCard from './ApplicationCard';
 import { useUpdateStatus } from '../../features/applications/applications.hooks';
 
 const COLUMNS: ApplicationStatus[] = ['Applied', 'Phone Screen', 'Interview', 'Offer', 'Rejected'];
@@ -12,11 +14,18 @@ interface KanbanBoardProps {
 
 export default function KanbanBoard({ applications, onCardClick }: KanbanBoardProps) {
   const updateStatus = useUpdateStatus();
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 200,
+        tolerance: 5,
       },
     })
   );
@@ -25,8 +34,15 @@ export default function KanbanBoard({ applications, onCardClick }: KanbanBoardPr
     return applications.filter(app => app.status === status);
   };
 
+  const activeApplication = activeId ? applications.find(app => app._id === activeId) : null;
+
+  const handleDragStart = (event: { active: { id: string | number } }) => {
+    setActiveId(String(event.active.id));
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    setActiveId(null);
     
     if (!over) return;
 
@@ -43,6 +59,7 @@ export default function KanbanBoard({ applications, onCardClick }: KanbanBoardPr
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
       <div className="flex gap-4 overflow-x-auto pb-4">
@@ -55,6 +72,14 @@ export default function KanbanBoard({ applications, onCardClick }: KanbanBoardPr
           />
         ))}
       </div>
+      <DragOverlay>
+        {activeApplication ? (
+          <ApplicationCard
+            application={activeApplication}
+            onClick={() => {}}
+          />
+        ) : null}
+      </DragOverlay>
     </DndContext>
   );
 }

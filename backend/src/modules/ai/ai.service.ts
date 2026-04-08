@@ -172,15 +172,7 @@ resumeSuggestions should be 3-5 concise, role-specific bullet points useful for 
         cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/```$/, '').trim();
       }
       const parsed = JSON.parse(cleanContent);
-      return {
-        company: parsed.company || 'Not specified',
-        role: parsed.role || 'Not specified',
-        requiredSkills: Array.isArray(parsed.requiredSkills) ? parsed.requiredSkills : [],
-        niceToHaveSkills: Array.isArray(parsed.niceToHaveSkills) ? parsed.niceToHaveSkills : [],
-        seniority: parsed.seniority || 'Mid',
-        location: parsed.location || 'Not specified',
-        resumeSuggestions: Array.isArray(parsed.resumeSuggestions) ? parsed.resumeSuggestions : [],
-      };
+      return validateAndNormalizeParsedData(parsed);
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       return parseLocally(jobDescription.toLowerCase());
@@ -190,6 +182,56 @@ resumeSuggestions should be 3-5 concise, role-specific bullet points useful for 
     return parseLocally(jobDescription.toLowerCase());
   }
 };
+
+const validateAndNormalizeParsedData = (parsed: unknown): ParsedJobData => {
+  if (!parsed || typeof parsed !== 'object') {
+    return getFallbackParsedData();
+  }
+
+  const data = parsed as Record<string, unknown>;
+
+  const validSeniorities = ['Intern', 'Junior', 'Mid', 'Senior', 'Lead', 'Principal', 'Staff', 'Manager', 'Director'];
+  let seniority = 'Mid';
+  if (typeof data.seniority === 'string' && validSeniorities.includes(data.seniority)) {
+    seniority = data.seniority;
+  }
+
+  const normalizeSkills = (skills: unknown): string[] => {
+    if (!Array.isArray(skills)) return [];
+    return skills
+      .filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+      .map((s) => s.trim())
+      .slice(0, 10);
+  };
+
+  const normalizeSuggestions = (suggestions: unknown): string[] => {
+    if (!Array.isArray(suggestions)) return [];
+    return suggestions
+      .filter((s): s is string => typeof s === 'string' && s.trim().length > 10)
+      .map((s) => s.trim())
+      .slice(0, 5);
+  };
+
+  return {
+    company: typeof data.company === 'string' && data.company.trim() ? data.company.trim() : 'Not specified',
+    role: typeof data.role === 'string' && data.role.trim() ? data.role.trim() : 'Not specified',
+    requiredSkills: normalizeSkills(data.requiredSkills),
+    niceToHaveSkills: normalizeSkills(data.niceToHaveSkills),
+    seniority,
+    location: typeof data.location === 'string' && data.location.trim() ? data.location.trim() : 'Not specified',
+    resumeSuggestions: normalizeSuggestions(data.resumeSuggestions),
+  };
+};
+
+const getFallbackParsedData = (): ParsedJobData => ({
+  company: 'Not specified',
+  role: 'Not specified',
+  requiredSkills: [],
+  niceToHaveSkills: [],
+  seniority: 'Mid',
+  location: 'Not specified',
+  resumeSuggestions: [],
+});
 
 const parseWithOpenAI = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
@@ -212,9 +254,10 @@ Return ONLY a valid JSON object with this exact structure:
   "requiredSkills": ["skill1", "skill2", ...],
   "niceToHaveSkills": ["skill1", "skill2", ...],
   "seniority": "Intern/Junior/Mid/Senior/Lead/Principal/Staff/Manager/Director or 'Mid'",
-  "location": "city name or 'Remote' or 'Not specified'"
+  "location": "city name or 'Remote' or 'Not specified'",
+  "resumeSuggestions": ["bullet point 1", "bullet point 2", "bullet point 3", "bullet point 4", "bullet point 5"]
 }
-Do not include any additional text or explanation.`
+resumeSuggestions should be 3-5 concise, role-specific bullet points useful for a resume. Make them specific, skill-aware, and professional. Avoid generic phrases like "hardworking team player". Do not include any additional text or explanation.`
           },
           {
             role: 'user',
@@ -239,16 +282,12 @@ Do not include any additional text or explanation.`
     }
 
     try {
-      const parsed = JSON.parse(content);
-      return {
-        company: parsed.company || 'Not specified',
-        role: parsed.role || 'Not specified',
-        requiredSkills: Array.isArray(parsed.requiredSkills) ? parsed.requiredSkills : [],
-        niceToHaveSkills: Array.isArray(parsed.niceToHaveSkills) ? parsed.niceToHaveSkills : [],
-        seniority: parsed.seniority || 'Mid',
-        location: parsed.location || 'Not specified',
-        resumeSuggestions: Array.isArray(parsed.resumeSuggestions) ? parsed.resumeSuggestions : [],
-      };
+      let cleanContent = content.trim();
+      if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+      }
+      const parsed = JSON.parse(cleanContent);
+      return validateAndNormalizeParsedData(parsed);
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       return parseLocally(jobDescription.toLowerCase());

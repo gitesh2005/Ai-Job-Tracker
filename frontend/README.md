@@ -28,7 +28,7 @@ cp .env.example .env
 
 3. Update `.env` with your API URL:
 ```
-VITE_API_BASE_URL=http://localhost:3000
+VITE_API_BASE_URL=http://localhost:5000/api
 ```
 
 4. Run development server:

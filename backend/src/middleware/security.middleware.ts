@@ -21,10 +21,10 @@ export const helmetMiddleware = helmet({
 
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: process.env.NODE_ENV === 'development' ? 1000 : 20,
   message: {
     success: false,
-    message: 'Too many attempts, please try again later',
+    message: 'Too many login attempts, please try again later',
   },
   standardHeaders: true,
   legacyHeaders: false,

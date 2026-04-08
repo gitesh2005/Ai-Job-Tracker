@@ -1,3 +1,5 @@
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { Application, ApplicationStatus } from '../../types';
 import { formatDate } from '../../utils/formatDate';
 import { cn } from '../../utils/cn';
@@ -5,7 +7,6 @@ import { cn } from '../../utils/cn';
 interface ApplicationCardProps {
   application: Application;
   onClick: () => void;
-  isDragging?: boolean;
 }
 
 const statusColors: Record<ApplicationStatus, { bg: string; text: string; dot: string }> = {
@@ -16,17 +17,35 @@ const statusColors: Record<ApplicationStatus, { bg: string; text: string; dot: s
   'Rejected': { bg: 'bg-red-100', text: 'text-red-700', dot: 'bg-red-500' },
 };
 
-export default function ApplicationCard({ application, onClick, isDragging }: ApplicationCardProps) {
+export default function ApplicationCard({ application, onClick }: ApplicationCardProps) {
   const statusStyle = statusColors[application.status];
+  
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: application._id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
       onClick={onClick}
       className={cn(
-        'group bg-white rounded-xl border border-gray-200 p-4 cursor-pointer',
+        'group bg-white rounded-xl border border-gray-200 p-4 cursor-grab active:cursor-grabbing',
         'transition-all duration-200 hover:shadow-lg hover:border-gray-300 hover:-translate-y-0.5',
         'focus:outline-none focus:ring-2 focus:ring-primary-500/20',
-        isDragging && 'shadow-xl ring-2 ring-primary-500 scale-105'
+        isDragging && 'shadow-xl ring-2 ring-primary-500 scale-105 opacity-80 z-50'
       )}
     >
       <div className="flex items-start justify-between gap-3 mb-3">

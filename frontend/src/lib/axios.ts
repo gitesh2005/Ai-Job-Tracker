@@ -30,7 +30,10 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+    
+    if (status === 401 || (status === 404 && message === 'User not found')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

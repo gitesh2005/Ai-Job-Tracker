@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLogin } from '../../features/auth/auth.hooks';
@@ -13,15 +14,18 @@ export default function AuthForm() {
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
   const login = useLogin();
   const navigate = useNavigate();
+  const [apiError, setApiError] = useState<string>('');
 
   const onSubmit = (data: LoginFormData) => {
+    setApiError('');
     login.mutate(data, {
       onSuccess: () => {
         navigate('/');
       },
-      onError: (error) => {
-        alert('Login failed: ' + (error as Error).message);
-      }
+      onError: (error: unknown) => {
+        const err = error as { response?: { data?: { message?: string } } };
+        setApiError(err.response?.data?.message || 'Login failed. Please try again.');
+      },
     });
   };
 
@@ -62,6 +66,12 @@ export default function AuthForm() {
             {...register('password', { required: 'Password is required' })}
             error={errors.password?.message}
           />
+
+          {apiError && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-600 text-center">{apiError}</p>
+            </div>
+          )}
 
           <Button type="submit" className="w-full !py-2.5" isLoading={login.isPending}>
             Sign In

@@ -37,8 +37,10 @@ export const authMiddleware = (
       next(new ApiError(401, 'Invalid token'));
     } else if (error instanceof jwt.TokenExpiredError) {
       next(new ApiError(401, 'Token expired'));
-    } else {
+    } else if (error instanceof ApiError) {
       next(error);
+    } else {
+      next(new ApiError(401, 'Authentication failed'));
     }
   }
 };
