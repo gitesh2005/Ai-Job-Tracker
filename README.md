@@ -77,6 +77,7 @@ ai-job-tracker/
 │   │   ├── hooks/
 │   │   ├── layouts/
 │   │   ├── pages/
+
 │   │   ├── router/
 │   │   ├── lib/                     # Axios client
 │   │   ├── types/                   # TypeScript types
