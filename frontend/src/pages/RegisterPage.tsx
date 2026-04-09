@@ -67,6 +67,7 @@ export default function RegisterPage() {
             type="password"
             label="Password"
             placeholder="Create a password"
+            showToggle
             {...register('password', { 
               required: 'Password is required',
               minLength: { value: 8, message: 'Password must be at least 8 characters' },
@@ -85,6 +86,7 @@ export default function RegisterPage() {
             type="password"
             label="Confirm Password"
             placeholder="Confirm your password"
+            showToggle
             {...register('confirmPassword', { 
               required: 'Please confirm your password',
               validate: (value, formValues) => 

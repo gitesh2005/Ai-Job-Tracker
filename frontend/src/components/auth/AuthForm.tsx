@@ -63,6 +63,7 @@ export default function AuthForm() {
             type="password"
             label="Password"
             placeholder="Enter your password"
+            showToggle
             {...register('password', { required: 'Password is required' })}
             error={errors.password?.message}
           />
