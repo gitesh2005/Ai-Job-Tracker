@@ -82,6 +82,9 @@ MONGODB_URI=your_mongodb_uri
 JWT_SECRET=your_jwt_secret
 OPENAI_API_KEY=your_openai_key
 OPENROUTER_API_KEY=your_openrouter_key
+OLLAMA_API_KEY=your_ollama_key
+OLLAMA_BASE_URL=https://api.ollama.ai
+OLLAMA_MODEL=llama3.2
 CLIENT_URL=http://localhost:5173
 ```
 

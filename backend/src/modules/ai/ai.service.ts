@@ -26,11 +26,78 @@ export const parseJobDescription = async (
     return parseWithOpenRouter(input.jobDescription);
   }
 
+  if (config.ollamaApiKey) {
+    return parseWithOllama(input.jobDescription);
+  }
+
   if (config.openAiApiKey) {
     return parseWithOpenAI(input.jobDescription);
   }
 
   return parseLocally(input.jobDescription.toLowerCase());
+};
+
+const parseWithOllama = async (jobDescription: string): Promise<ParsedJobData> => {
+  try {
+    const response = await fetch(`${config.ollamaBaseUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.ollamaApiKey}`,
+      },
+      body: JSON.stringify({
+        model: config.ollamaModel,
+        messages: [
+          {
+            role: 'system',
+            content: `You are a job description parser. Parse the following job description and extract structured information. 
+Return ONLY a valid JSON object with this exact structure:
+{
+  "company": "company name or 'Not specified'",
+  "role": "job title or 'Not specified'",
+  "requiredSkills": ["skill1", "skill2", ...],
+  "niceToHaveSkills": ["skill1", "skill2", ...],
+  "seniority": "Intern/Junior/Mid/Senior/Lead/Principal/Staff/Manager/Director or 'Mid'",
+  "location": "city name or 'Remote' or 'Not specified'",
+  "resumeSuggestions": ["bullet point 1", "bullet point 2", "bullet point 3", "bullet point 4", "bullet point 5"]
+}
+resumeSuggestions should be 3-5 concise, role-specific bullet points useful for a resume. Do not include any additional text or explanation.`
+          },
+          {
+            role: 'user',
+            content: jobDescription
+          }
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    if (!response.ok) {
+      return parseLocally(jobDescription.toLowerCase());
+    }
+
+    const data = await response.json() as { message?: { content?: string } };
+    const content = data.message?.content;
+
+    if (!content) {
+      return parseLocally(jobDescription.toLowerCase());
+    }
+
+    try {
+      let cleanContent = content.trim();
+      if (cleanContent.startsWith('```')) {
+        cleanContent = cleanContent.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+      }
+      const parsed = JSON.parse(cleanContent);
+      return validateAndNormalizeParsedData(parsed);
+    } catch (parseError) {
+      console.error('Failed to parse AI response:', parseError);
+      return parseLocally(jobDescription.toLowerCase());
+    }
+  } catch (error) {
+    console.error('Ollama API call failed:', error);
+    return parseLocally(jobDescription.toLowerCase());
+  }
 };
 
 const parseLocally = (text: string): ParsedJobData => {
