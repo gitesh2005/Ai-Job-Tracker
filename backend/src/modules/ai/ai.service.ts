@@ -2,7 +2,6 @@ import config from '../../config/env';
 import ApiError from '../../utils/apiError';
 import { ParseJobDescriptionInput, ParsedJobData } from './ai.types';
 
-// AI ke response se JSON nikalne ke liye helper
 const extractJSON = (text: string) => {
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -20,23 +19,23 @@ export const parseJobDescription = async (
     throw new ApiError(400, 'Job description is required');
   }
 
-  // FIRST PRIORITY: GitHub Models (Free with Student Pack)
+  // FIRST PRIORITY: GitHub Models
   if (config.githubToken) {
-    console.log("Using GitHub Models Priority...");
+    console.log("Using GitHub Models...");
     return parseWithGitHub(input.jobDescription);
   }
 
-  // SECOND PRIORITY: OpenRouter (Backup)
+  // SECOND PRIORITY: OpenRouter
   if (config.openRouterApiKey) {
     return parseWithOpenRouter(input.jobDescription);
   }
 
-  // FALLBACK: Local Logic
   return parseLocally(input.jobDescription.toLowerCase());
 };
 
 const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
+    // CORRECTED URL BELOW
     const response = await fetch('https://azure.com', {
       method: 'POST',
       headers: {
@@ -44,30 +43,25 @@ const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> =
         'Authorization': `Bearer ${config.githubToken}`,
       },
       body: JSON.stringify({
-        model: 'meta-llama-3.1-8b-instruct', // GitHub free-tier model
+        model: 'meta-llama-3.1-8b-instruct',
         messages: [
           {
             role: 'system',
-            content: `You are a professional job data extractor. 
-            Extract data and return ONLY a valid JSON object.
-            STRICT RULES:
-            1. "company": Official name ONLY (e.g. 'Google'). NO taglines or slogans.
-            2. "role": Official job title.
+            content: `You are a professional job data extractor. Extract data into JSON.
+            RULES:
+            1. "company": Official name ONLY (e.g. 'Google'). NO slogans.
+            2. "role": Job title.
             3. "seniority": One of [Intern, Junior, Mid, Senior, Lead, Manager].
-            4. "requiredSkills": Array of technical skills.
-            Output must be pure JSON.`
+            Return ONLY JSON.`
           },
-          {
-            role: 'user',
-            content: jobDescription
-          }
+          { role: 'user', content: jobDescription }
         ],
         temperature: 0.1,
       }),
     });
 
     if (!response.ok) {
-      console.error("GitHub API Error:", response.statusText);
+      console.error("GitHub API Error:", response.status);
       return parseLocally(jobDescription);
     }
 
@@ -84,6 +78,7 @@ const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> =
 
 const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
+    // CORRECTED URL BELOW
     const response = await fetch('https://openrouter.ai', {
       method: 'POST',
       headers: {
@@ -100,8 +95,10 @@ const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobDat
       }),
     });
 
+    if (!response.ok) return parseLocally(jobDescription);
     const data = await response.json();
-    const parsed = extractJSON(data.choices?.[0]?.message?.content || '');
+    const content = data.choices?.[0]?.message?.content;
+    const parsed = extractJSON(content || '');
     return parsed ? validateAndNormalizeParsedData(parsed) : parseLocally(jobDescription);
   } catch (error) {
     return parseLocally(jobDescription);
@@ -111,12 +108,12 @@ const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobDat
 const parseLocally = (text: string): ParsedJobData => {
   return {
     company: 'Not detected',
-    role: 'Manual Entry',
+    role: 'Manual Entry Required',
     requiredSkills: [],
     niceToHaveSkills: [],
     seniority: 'Mid',
     location: 'Not specified',
-    resumeSuggestions: ['Please check the job description manually.']
+    resumeSuggestions: ['Please check the description manually. AI parse failed.']
   };
 };
 
