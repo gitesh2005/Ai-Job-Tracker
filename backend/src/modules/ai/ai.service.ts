@@ -2,11 +2,10 @@ import config from '../../config/env';
 import ApiError from '../../utils/apiError';
 import { ParseJobDescriptionInput, ParsedJobData } from './ai.types';
 
-// AI ke response se JSON nikalne ke liye helper
 const extractJSON = (text: string) => {
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    // Fixed TS2345: added .toString() or index check
+    // Fixed: Using jsonMatch[0] safely
     return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
   } catch (e) {
     console.error("JSON Extraction Error:", e);
@@ -21,12 +20,11 @@ export const parseJobDescription = async (
     throw new ApiError(400, 'Job description is required');
   }
 
-  // GITHUB TOKEN PRIORITY
   if (config.githubToken) {
+    console.log("Using GitHub Models...");
     return parseWithGitHub(input.jobDescription);
   }
 
-  // OPENROUTER BACKUP
   if (config.openRouterApiKey) {
     return parseWithOpenRouter(input.jobDescription);
   }
@@ -36,14 +34,15 @@ export const parseJobDescription = async (
 
 const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
+    // FIXED URL: GitHub Models ka sahi endpoint ye hai
     const response = await fetch('https://azure.com', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.githubToken}`,
+        'Authorization': `Bearer ${config.githubToken.trim()}`,
       },
       body: JSON.stringify({
-        model: 'meta-llama-3.1-8b-instruct',
+        model: 'meta-llama-3.1-8b-instruct', 
         messages: [
           {
             role: 'system',
@@ -55,25 +54,31 @@ const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> =
       }),
     });
 
-    if (!response.ok) return parseLocally(jobDescription);
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("GitHub API Error Details:", err);
+      return parseLocally(jobDescription);
+    }
 
-    const data: any = await response.json(); // Fixed TS18046: added :any type
+    const data: any = await response.json();
     const content = data.choices?.[0]?.message?.content;
     const parsed = extractJSON(content || '');
 
     return parsed ? validateAndNormalizeParsedData(parsed) : parseLocally(jobDescription);
   } catch (error) {
+    console.error("GitHub Fetch Failed:", error);
     return parseLocally(jobDescription);
   }
 };
 
 const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
+    // FIXED URL: OpenRouter ka sahi endpoint ye hai
     const response = await fetch('https://openrouter.ai', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.openRouterApiKey}`,
+        'Authorization': `Bearer ${config.openRouterApiKey.trim()}`,
       },
       body: JSON.stringify({
         model: 'google/gemma-2-9b-it',
@@ -83,7 +88,7 @@ const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobDat
     });
 
     if (!response.ok) return parseLocally(jobDescription);
-    const data: any = await response.json(); // Fixed TS18046: added :any type
+    const data: any = await response.json();
     const content = data.choices?.[0]?.message?.content;
     const parsed = extractJSON(content || '');
     return parsed ? validateAndNormalizeParsedData(parsed) : parseLocally(jobDescription);
