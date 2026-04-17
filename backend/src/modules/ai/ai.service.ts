@@ -2,10 +2,12 @@ import config from '../../config/env';
 import ApiError from '../../utils/apiError';
 import { ParseJobDescriptionInput, ParsedJobData } from './ai.types';
 
+// AI ke response se JSON nikalne ke liye helper
 const extractJSON = (text: string) => {
   try {
     const jsonMatch = text.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch) : null;
+    // Fixed TS2345: added .toString() or index check
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : null;
   } catch (e) {
     console.error("JSON Extraction Error:", e);
     return null;
@@ -19,13 +21,12 @@ export const parseJobDescription = async (
     throw new ApiError(400, 'Job description is required');
   }
 
-  // FIRST PRIORITY: GitHub Models
+  // GITHUB TOKEN PRIORITY
   if (config.githubToken) {
-    console.log("Using GitHub Models...");
     return parseWithGitHub(input.jobDescription);
   }
 
-  // SECOND PRIORITY: OpenRouter
+  // OPENROUTER BACKUP
   if (config.openRouterApiKey) {
     return parseWithOpenRouter(input.jobDescription);
   }
@@ -35,7 +36,6 @@ export const parseJobDescription = async (
 
 const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
-    // CORRECTED URL BELOW
     const response = await fetch('https://azure.com', {
       method: 'POST',
       headers: {
@@ -47,12 +47,7 @@ const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> =
         messages: [
           {
             role: 'system',
-            content: `You are a professional job data extractor. Extract data into JSON.
-            RULES:
-            1. "company": Official name ONLY (e.g. 'Google'). NO slogans.
-            2. "role": Job title.
-            3. "seniority": One of [Intern, Junior, Mid, Senior, Lead, Manager].
-            Return ONLY JSON.`
+            content: `Extract data into JSON. Company name ONLY (e.g. Google). Return ONLY JSON.`
           },
           { role: 'user', content: jobDescription }
         ],
@@ -60,25 +55,20 @@ const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> =
       }),
     });
 
-    if (!response.ok) {
-      console.error("GitHub API Error:", response.status);
-      return parseLocally(jobDescription);
-    }
+    if (!response.ok) return parseLocally(jobDescription);
 
-    const data = await response.json();
+    const data: any = await response.json(); // Fixed TS18046: added :any type
     const content = data.choices?.[0]?.message?.content;
     const parsed = extractJSON(content || '');
 
     return parsed ? validateAndNormalizeParsedData(parsed) : parseLocally(jobDescription);
   } catch (error) {
-    console.error("GitHub Call Failed:", error);
     return parseLocally(jobDescription);
   }
 };
 
 const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
-    // CORRECTED URL BELOW
     const response = await fetch('https://openrouter.ai', {
       method: 'POST',
       headers: {
@@ -87,16 +77,13 @@ const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobDat
       },
       body: JSON.stringify({
         model: 'google/gemma-2-9b-it',
-        messages: [
-          { role: 'system', content: 'Extract job info to JSON. Company name ONLY.' },
-          { role: 'user', content: jobDescription }
-        ],
+        messages: [{ role: 'system', content: 'Extract job data to JSON.' }, { role: 'user', content: jobDescription }],
         temperature: 0.1,
       }),
     });
 
     if (!response.ok) return parseLocally(jobDescription);
-    const data = await response.json();
+    const data: any = await response.json(); // Fixed TS18046: added :any type
     const content = data.choices?.[0]?.message?.content;
     const parsed = extractJSON(content || '');
     return parsed ? validateAndNormalizeParsedData(parsed) : parseLocally(jobDescription);
@@ -113,7 +100,7 @@ const parseLocally = (text: string): ParsedJobData => {
     niceToHaveSkills: [],
     seniority: 'Mid',
     location: 'Not specified',
-    resumeSuggestions: ['Please check the description manually. AI parse failed.']
+    resumeSuggestions: ['AI parse failed, check manually.']
   };
 };
 
@@ -125,6 +112,6 @@ const validateAndNormalizeParsedData = (data: any): ParsedJobData => {
     niceToHaveSkills: Array.isArray(data.niceToHaveSkills) ? data.niceToHaveSkills : [],
     seniority: data.seniority || 'Mid',
     location: data.location || 'Not specified',
-    resumeSuggestions: Array.isArray(data.resumeSuggestions) ? data.resumeSuggestions : ['Tailor resume.']
+    resumeSuggestions: Array.isArray(data.resumeSuggestions) ? data.resumeSuggestions : ['Update your resume points.']
   };
 };
