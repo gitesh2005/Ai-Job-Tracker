@@ -20,33 +20,28 @@ export const parseJobDescription = async (
     throw new ApiError(400, 'Job description is required');
   }
 
-  if (config.githubToken) {
-    console.log("Using GitHub Models...");
-    return parseWithGitHub(input.jobDescription);
-  }
-
-  if (config.openRouterApiKey) {
-    return parseWithOpenRouter(input.jobDescription);
+  if (config.groqApiKey) {
+    console.log("Using Groq Cloud...");
+    return parseWithGroq(input.jobDescription);
   }
 
   return parseLocally(input.jobDescription.toLowerCase());
 };
 
-const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> => {
+const parseWithGroq = async (jobDescription: string): Promise<ParsedJobData> => {
   try {
-    // FIXED URL: GitHub Models ka sahi endpoint ye hai
-    const response = await fetch('https://azure.com', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.githubToken.trim()}`,
+        'Authorization': `Bearer ${config.groqApiKey.trim()}`,
       },
       body: JSON.stringify({
-        model: 'meta-llama-3.1-8b-instruct', 
+        model: 'llama-3.1-8b-instant',
         messages: [
           {
             role: 'system',
-            content: `Extract data into JSON. Company name ONLY (e.g. Google). Return ONLY JSON.`
+            content: `Extract job data to JSON with fields: company, role, requiredSkills (array), niceToHaveSkills (array), seniority, location, resumeSuggestions (array). Return ONLY JSON.`
           },
           { role: 'user', content: jobDescription }
         ],
@@ -56,43 +51,16 @@ const parseWithGitHub = async (jobDescription: string): Promise<ParsedJobData> =
 
     if (!response.ok) {
       const err = await response.text();
-      console.error("GitHub API Error Details:", err);
+      console.error("Groq API Error:", err);
       return parseLocally(jobDescription);
     }
 
     const data: any = await response.json();
     const content = data.choices?.[0]?.message?.content;
     const parsed = extractJSON(content || '');
-
     return parsed ? validateAndNormalizeParsedData(parsed) : parseLocally(jobDescription);
   } catch (error) {
-    console.error("GitHub Fetch Failed:", error);
-    return parseLocally(jobDescription);
-  }
-};
-
-const parseWithOpenRouter = async (jobDescription: string): Promise<ParsedJobData> => {
-  try {
-    // FIXED URL: OpenRouter ka sahi endpoint ye hai
-    const response = await fetch('https://openrouter.ai', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.openRouterApiKey.trim()}`,
-      },
-      body: JSON.stringify({
-        model: 'google/gemma-2-9b-it',
-        messages: [{ role: 'system', content: 'Extract job data to JSON.' }, { role: 'user', content: jobDescription }],
-        temperature: 0.1,
-      }),
-    });
-
-    if (!response.ok) return parseLocally(jobDescription);
-    const data: any = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-    const parsed = extractJSON(content || '');
-    return parsed ? validateAndNormalizeParsedData(parsed) : parseLocally(jobDescription);
-  } catch (error) {
+    console.error("Groq Fetch Failed:", error);
     return parseLocally(jobDescription);
   }
 };
